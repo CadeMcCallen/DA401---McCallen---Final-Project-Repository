@@ -1,4 +1,4 @@
-# DA401 Capstone Project - [Your Name]
+# DA401 Capstone Project - Cade McCallen
 
 ## Project Title
 (Write a clear, descriptive title for your project.)
@@ -16,7 +16,7 @@ Which methods or models will you use?
 What do you expect to produce every week?
 
 ## Google Drive 
-[Google Drive link if you have any]
+https://drive.google.com/drive/folders/1FbFkv6K4dOocddwzuEHm0dRQFko2p2Dm?usp=drive_link
 
 ## Repository Structure
 - `code/`: All analysis scripts or notebooks
