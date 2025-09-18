@@ -1,0 +1,26 @@
+---
+title: "dataChallenge"
+format: html
+editor: visual
+---
+
+## Quarto
+
+```{r}
+set.seed(123)
+starbucks <- read.csv("data/starbucks_locations.csv")
+
+lat <- as.numeric(readline(prompt = "Latitude: "))
+long <- as.numeric(readline(prompt = "Longitude: "))
+
+nearest_starbucks <- function(latitude, longitude) {
+  distance <- sqrt((starbucks$Latitude - latitude)^2 + (starbucks$Longitude - longitude)^2)
+  
+  closest_index <- which.min(distance)
+  
+  return(starbucks$Store.Name[closest_index])
+}
+
+closest <- nearest_starbucks(lat, long)
+cat("The nearest Starbucks is:", closest)
+```
