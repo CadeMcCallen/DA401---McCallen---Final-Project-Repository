@@ -2,7 +2,9 @@
 
 ## Analysis of Environmental Impacts and Management Style on Crop Yield 
 
-## What effect do environmental variables (e.g., temperature, precipitation) and management styles (e.g., acres irrigated, heavy equipment used) have on corn crop yield (BU/acre)? 
+## Research Question
+
+What effect do environmental variables (e.g., temperature, precipitation) and management styles (e.g., acres irrigated, heavy equipment used) have on corn crop yield (BU/acre)? 
 
 ## Data Sources
 
@@ -12,10 +14,24 @@ National Agricultural Statistics Service. (n.d.). QuickStats database [Data set]
 
 ## Methods and Models used
 
-Beta Linear Mixed 
+Beta Linear Mixed-Effects and linear mixed effect models
 
 ## Expected Timeline
-What do you expect to produce every week?
+
+Week of:
+
+10/26 - Finalize Environmental Analysis, Begin and mostly complete management style analysis
+
+11/2 - Model validations, final graphics, and otherwise are made. Put into a final paper rough draft, due the 9th.
+
+11/9 - Revise final paper as needed. Do additional anlaysis if necessary
+
+11/16 - Continue Revisions and additions
+
+11/23 - Thanksgiving Break
+
+11/30 - Begin final Presentations
+
 
 ## Google Drive 
 https://drive.google.com/drive/folders/1FbFkv6K4dOocddwzuEHm0dRQFko2p2Dm?usp=drive_link
