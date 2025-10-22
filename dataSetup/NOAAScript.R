@@ -1,3 +1,4 @@
+#test
 library(dplyr)
 precip <- read.csv("initialData/precip.csv")
 avgT <- read.csv("initialData/avgTemp.csv")
