@@ -14,7 +14,7 @@ National Agricultural Statistics Service. (n.d.). QuickStats database [Data set]
 
 ## Methods and Models used
 
-Beta Linear Mixed-Effects and linear mixed effect models
+Linear Mixed-Effects models and PCA
 
 ## Expected Timeline
 
@@ -37,7 +37,10 @@ Week of:
 https://drive.google.com/drive/folders/1FbFkv6K4dOocddwzuEHm0dRQFko2p2Dm?usp=drive_link
 
 ## Repository Structure
-- `code/`: All analysis scripts or notebooks
+- `InClass/`: Scripts from in-class activities
+- `analysisCode/`: All analysis scripts
+- `data/`: Only final data for project - initial file csvs and data in Google Drive
+- `dataSetup/`: Files used for data cleaning of initial data csvs - includes PCA done on environmental variables
+- `visuals/`: Plots, charts, visualizations
 - `writing/`: Proposal, drafts, final paper
-- `figures/`: Plots, charts, visualizations
-- `data/`: Only small sample data (large files go in Google Drive)
+
