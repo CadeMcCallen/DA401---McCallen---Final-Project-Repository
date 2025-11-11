@@ -3,40 +3,54 @@ library(dplyr)
 library(glmmTMB)
 library(performance)
 library(DHARMa)
+library(tidyr)
+library(nlme)
+
 df <- final %>%
   filter(missingWeather == FALSE) %>%
   select(-missingWeather, -ID, -agDistrictCode)
 
 ### Linear Mixed Effect --- Doesn't work because there isn't variation between crop yield in months I think IGNORE:
-library(nlme)
-
 
 df <- df %>%
   mutate(
     cornYield = as.numeric(str_replace_all(cornYield, ",", "")) #ADD TO ORIGINAL DATA FRAME!!!
   )
 
-df_model <- df %>%
-  mutate(
-    month_num = case_when(
-      month == "Jan" ~ 1,
-      month == "Feb" ~ 2,
-      month == "Mar" ~ 3,
-      month == "Apr" ~ 4,
-      month == "May" ~ 5,
-      month == "Jun" ~ 6,
-      month == "Jul" ~ 7,
-      month == "Aug" ~ 8,
-      month == "Sep" ~ 9,
-      month == "Oct" ~ 10,
-      month == "Nov" ~ 11,
-      month == "Dec" ~ 12,
-      TRUE ~ NA_real_
-    )
-  ) %>%
-  filter(!is.na(cornYield), !is.na(precip), !is.na(avgT), !is.na(minT), !is.na(frozen))
+# df_model <- df %>%
+#   mutate(
+#     month_num = case_when(
+#       month == "Jan" ~ 1,
+#       month == "Feb" ~ 2,
+#       month == "Mar" ~ 3,
+#       month == "Apr" ~ 4,
+#       month == "May" ~ 5,
+#       month == "Jun" ~ 6,
+#       month == "Jul" ~ 7,
+#       month == "Aug" ~ 8,
+#       month == "Sep" ~ 9,
+#       month == "Oct" ~ 10,
+#       month == "Nov" ~ 11,
+#       month == "Dec" ~ 12,
+#       TRUE ~ NA_real_
+#     )
+#   ) %>%
+#   filter(!is.na(cornYield), !is.na(precip), !is.na(avgT), !is.na(minT), !is.na(frozen))
 
 
+#For final weather csv with above
+#write.csv(df_model, "weather_cornyield_final.csv", row.names = FALSE)
+
+
+
+
+
+
+
+
+
+
+df_model <- read.csv("data/weather_cornyield_final.csv")
 
 model_yield <- lme(
   cornYield ~ precip + avgT,            
@@ -51,8 +65,6 @@ summary(model_yield)
 
 
 ### Linear Mixed Effect --- Attempt 2  ---- AvgT and Precip
-library(tidyr)
-
 df_wide <- df_model %>%
   select(year, county, cornYield, month, month_num, precip, avgT, minT, frozen) %>%
   pivot_wider(
@@ -67,6 +79,10 @@ monthly_vars <- grep("precip_|avgT_", names(df_wide), value = TRUE)
 #This just makes it into  formula
 fixed_formula <- as.formula(paste("cornYield ~", paste(monthly_vars, collapse = " + ")))
 # print(fixed_formula)
+
+
+df_wide <- df_wide %>%
+  mutate(across(starts_with(c("precip_", "avgT_", "minT_")), scale))
 
 
 model_yield_final <- lme(
@@ -112,6 +128,8 @@ ggplot(fixed_effects_df, aes(x = month, y = estimate, color = variable)) +
 
 month_order <- c("Jan", "Feb", "Mar", "Apr", "May", "Jun", 
                  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
+
+##Attempt to make significance marked (not working)
 fixed_effects_df <- fixed_effects_df %>%
   mutate(month = factor(month, levels = month_order)) %>%
   mutate(
@@ -136,7 +154,7 @@ ggplot(fixed_effects_df,
   theme(
     axis.text.x = element_text(angle = 90, hjust = 1),
     legend.position = "none"
-  )
+  ) 
 
 monthly_vars_2 <- grep("precip_|frozen_", names(df_wide), value = TRUE)
 fixed_formula_2 <- as.formula(paste("cornYield ~", paste(monthly_vars_2, collapse = " + ")))

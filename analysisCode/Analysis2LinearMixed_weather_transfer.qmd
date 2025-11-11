@@ -1,0 +1,274 @@
+---
+title: "Anlaysis2-WeatherTransfer"
+author: "Cade McCallen"
+format: html
+editor: visual
+---
+
+```{r}
+library(dplyr)
+library(glmmTMB)
+library(performance)
+library(DHARMa)
+library(tidyr)
+library(nlme)
+
+
+
+#df_model <- read.csv("data/weather_cornyield_final.csv")
+```
+
+## Weather Temp Model
+
+```{r, weatherTempModel}
+df_wide <- df_model %>%
+  select(year, county, cornYield, month, month_num, precip, avgT, minT, frozen) %>%
+  pivot_wider(
+    id_cols = c(year, county, cornYield), names_from = month_num,               
+    values_from = c(precip, avgT, minT, frozen) 
+  ) %>%
+  distinct()
+
+#This gets the columns in one variable since there are 24 of them in in the model
+monthly_vars <- grep("precip_|avgT_", names(df_wide), value = TRUE)
+
+#This just makes it into  formula
+fixed_formula <- as.formula(paste("cornYield ~", paste(monthly_vars, collapse = " + ")))
+# print(fixed_formula)
+
+#Scale - used to determine which effect was greater
+df_wide <- df_wide %>% mutate(across(starts_with(c("precip_", "avgT_")), ~ as.numeric(scale(.x)), .names = "{.col}"))
+
+
+model1 <- lme(
+  fixed_formula,                
+  random = ~ 1 | county,        
+  data = df_wide,             
+  method = "REML"
+)
+
+#library(performance)
+#r2(model1)
+
+#summary(model_yield_final)
+```
+
+## Model Comparison testing
+
+```{r}
+#Model 2, includes min temp
+monthly_vars2 <- grep("precip_|avgT_|minT_", names(df_wide), value = TRUE)
+fixed_formula2 <- as.formula(paste("cornYield ~", paste(monthly_vars2, collapse = " + ")))
+
+model2 <- lme(
+  fixed_formula2,
+  random = ~1 | county,
+  data = df_wide,
+  method = "REML"
+)
+
+
+#Model 3 (not good)
+model3 <- lme(
+  fixed = fixed_formula,        
+  random = ~ avgT_7 | county,     
+  data = df_wide,
+  method = "REML"
+)
+
+anova(model1, model3)
+
+
+#Model using frost was done in Analysis2-LinearMixed.R
+
+#anova(model1, model2)
+#summary(model2)
+```
+
+## Weather Temp Assumptions
+
+```{r}
+plot(model_yield_final)
+qqnorm(residuals(model2))
+qqline(residuals(model_yield_final))
+plot(fitted(model_yield_final), residuals(model_yield_final))
+
+#qqnorm(ranef(model_yield_final)$county[,1])
+#qqline(ranef(model_yield_final)$county[,1])
+car::vif(lm(fixed_formula, data = df_wide))
+```
+
+## Weather Temp Viz
+
+```{r}
+model_yield_final <- model1
+
+library(broom.mixed)
+library(dplyr)
+library(ggplot2)
+
+#I used chat GPT to help with this visualization since I could not figure out the broom.mixed package
+fixed_effects_weather_df <- broom.mixed::tidy(model_yield_final) %>%
+  filter(effect == "fixed", term != "(Intercept)") %>%
+  mutate(
+    variable = gsub("_\\d+", "", term),
+    month_num = as.numeric(gsub(".*_", "", term)),
+    month = factor(month.abb[month_num], levels = month.abb),
+    CI_lower = estimate - 1.96 * std.error,
+    CI_upper = estimate + 1.96 * std.error,
+    is_significant = (CI_lower > 0 & CI_upper > 0) | (CI_lower < 0 & CI_upper < 0)
+  )
+
+fixed_effects_weather_df <- fixed_effects_weather_df %>%
+  mutate(variable = recode(variable,
+                           "avgT" = "Temperature (°F)",
+                           "precip" = "Precipitation (in)"))
+
+base_colors <- c("TRUE" = "#E74C3C", "FALSE" = "#3498DB")
+
+
+weatherplot1 <- ggplot(fixed_effects_weather_df, aes(x = month, y = estimate, color = is_significant)) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "gray50") +
+  geom_pointrange(aes(ymin = CI_lower, ymax = CI_upper), size = 1.1) +
+  facet_wrap(~ variable, scales = "free_y", ncol = 2) +
+  scale_color_manual(values = base_colors) +
+  labs(
+    title = "Monthly Weather Effects Impact Corn Yield",
+    x = "Month",
+    y = "Change in Corn Yield (bu/acre)",
+    caption = "Figure 1. Estimated change in corn yield (bu/acre) for a 1-unit increase in monthly
+temperature (°F) or precipitation (in), based on fixed effects from the mixed-effects model. Average bu/acre is 149.
+Error bars represent 95% confidence intervals; red indicates statistically significant effects (p < 0.05).
+Note: The two graphs use different y-axis scales, so effect magnitudes should be interpreted within each panel."
+  ) +
+  theme_minimal(base_size = 14, base_family = "serif") +
+  theme(
+    panel.grid = element_blank(),
+    axis.text.x = element_text(angle = 90, hjust = 1),
+    legend.position = "none",
+    strip.text = element_text(face = "bold", family = "serif"),
+    plot.title = element_text(face = "bold", family = "serif"),
+    plot.caption = element_text(hjust = 0, size = 10, family = "serif"),
+    panel.spacing.y = unit(1, "lines")
+  ) +
+  coord_cartesian(clip = "off")
+#ggsave("visuals/weather_effects.png", plot = weatherplot1, width = 7, height = 5, units = "in")
+```
+
+## Temp vs precip compare (incomplete)
+
+```{r}
+library(performance)
+
+r2_full <- r2(model1)
+
+fixed_no_precip <- as.formula(paste(
+  "cornYield ~", 
+  paste(grep("avgT_", monthly_vars, value = TRUE), collapse = " + ")
+))
+model_no_precip <- update(model1, fixed = fixed_no_precip)
+r2_no_precip <- r2(model_no_precip)
+
+# model without temp
+fixed_no_temp <- as.formula(paste(
+  "cornYield ~", 
+  paste(grep("precip_", monthly_vars, value = TRUE), collapse = " + ")
+))
+model_no_temp <- update(model1, fixed = fixed_no_temp)
+r2_no_temp <- r2(model_no_temp)
+
+r2_full; r2_no_precip; r2_no_temp
+
+```
+
+# STARTING ANALYSIS AGAIN WITH YEAR SHIFT, GEMINI USED TO REDO ANALYSIS QUICKLY
+
+## Year Shift:
+
+Note: This shifted model is what is used in analysis3, with the management style variables (or rather, the PCA was done on the year shifted model, and then used in analysis 3)
+
+```{r}
+
+df_yield_key <- df_model %>%
+  select(year, county, cornYield) %>%
+  distinct()
+
+#Shifts nov and dec to be for in the next year
+df_weather_shifted <- df_model %>%
+  select(year, county, month_num, precip, avgT, minT, frozen) %>%
+  mutate(
+    year = if_else(month_num %in% c(11, 12), year + 1, year)
+  )
+
+
+df_wide <- df_weather_shifted %>%
+  pivot_wider(
+    id_cols = c(year, county),
+    names_from = month_num,
+    values_from = c(precip, avgT, minT, frozen)
+  ) %>%
+  left_join(df_yield_key, by = c("year", "county"))
+
+df_wide_clean <- df_wide %>%
+
+  filter(!is.na(cornYield)) %>%
+  drop_na(starts_with(c("precip_", "avgT_", "minT_", "frozen_")))
+
+
+# This gets the columns in one variable (precip_1 to precip_12, avgT_1 to avgT_12)
+monthly_vars <- grep("precip_|avgT_", names(df_wide_clean), value = TRUE)
+
+# This just makes it into formula
+fixed_formula <- as.formula(paste("cornYield ~", paste(monthly_vars, collapse = " + ")))
+# print(fixed_formula)
+
+# Scale - used to determine which effect was greater
+#df_wide_clean <- df_wide_clean %>% mutate(across(starts_with(c("precip_", "avgT_", "minT_")), ~ as.numeric(scale(.x)), .names = "{.col}"))
+
+
+model1 <- lme(
+  fixed_formula,
+  random = ~ 1 | county,
+  data = df_wide_clean,
+  method = "REML"
+)
+
+model_yield_final<- model1
+```
+
+```{r}
+#Model 2, includes min temp
+monthly_vars2 <- grep("precip_|avgT_|minT_", names(df_wide_clean), value = TRUE)
+fixed_formula2 <- as.formula(paste("cornYield ~", paste(monthly_vars2, collapse = " + ")))
+
+model2 <- lme(
+  fixed_formula2,
+  random = ~1 | county,
+  data = df_wide_clean,
+  method = "REML"
+)
+
+
+#Model 3 (not good)
+model3 <- lme(
+  fixed = fixed_formula,        
+  random = ~ avgT_7 | county,     
+  data = df_wide,
+  method = "REML"
+)
+
+anova(model1, model2)
+
+
+#Model using frost was done in Analysis2-LinearMixed.R
+
+#anova(model1, model2)
+#summary(model2)
+```
+
+## 
+
+```{r}
+
+
+```

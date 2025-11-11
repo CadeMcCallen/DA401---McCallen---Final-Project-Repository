@@ -1,0 +1,228 @@
+---
+title: "Analysis2ManSoc"
+author: "Cade McCallen"
+format: html
+editor: visual
+---
+
+```{r}
+library(dplyr)
+library(nlme)
+
+#soc_man <- read.csv("data/soc_man_final.csv")
+#weather <- read.csv("data/weather_cornyield_final_pca.csv")
+
+soc_man <- soc_man %>%
+  mutate(year = if_else(year == 2022, 2021, year))
+
+core_vars <- c("areaOperatedAcresOperationMedian", "valueMachineryAssetValue", "machineryAssetValueZ", "acresCroplandTreated",      
+  "areaNoTill", "avgProducerAge", "CropAcresOperation", "avgYearsOnPresentOperation")
+soc_man_select <- soc_man %>%
+  select(year, county, all_of(core_vars))
+
+df_merged <- weather %>%
+  left_join(soc_man_select, by = c("year", "county"))
+
+survey_years <- c(2002, 2007, 2012, 2017, 2021)
+
+df_survey_years <- df_merged %>%
+  filter(year %in% survey_years)
+
+```
+
+## Scaling
+
+```{r}
+vars_to_scale <- setdiff(core_vars, "machineryAssetValueZ")
+
+df_scaled <- df_survey_years %>%
+  mutate(across(all_of(vars_to_scale),
+                ~ as.numeric(scale(.x)),
+                .names = "{.col}_scaled"))
+
+all_scaled_fixed_vars <- c(
+  paste0("PC", 1:10),
+  paste0(vars_to_scale, "_scaled"),
+  "machineryAssetValueZ" #already a z-score
+)
+```
+
+## Model1
+
+```{r}
+
+core_fixed_vars <- c(
+  paste0("PC", 1:10), 
+  "acresCroplandTreated_scaled",
+  "areaOperatedAcresOperationMedian_scaled",
+  "machineryAssetValueZ"
+)
+
+core_fixed_formula <- as.formula(paste("cornYield ~", paste(core_fixed_vars, collapse = " + ")))
+
+df_core_model_data <- df_scaled %>%
+  select(year, county, cornYield, all_of(core_fixed_vars)) %>%
+  na.omit() 
+
+
+model_core1 <- lme(
+  fixed = core_fixed_formula,
+  random = ~ 1 | county,
+  data = df_core_model_data,
+  method = "REML"
+)
+
+#summary(model_core1)
+```
+
+## Model1 vis
+
+```{r}
+library(broom.mixed)
+library(dplyr)
+library(ggplot2)
+library(stringr) 
+
+fixed_effects_mgt_df <- broom.mixed::tidy(model_core1) %>%
+  filter(effect == "fixed", term != "(Intercept)") %>%
+  
+  filter(term %in% c("acresCroplandTreated_scaled", 
+                     "areaOperatedAcresOperationMedian_scaled", 
+                     "machineryAssetValueZ")) %>%
+  mutate(CI_lower = estimate - 1.96 * std.error, CI_upper = estimate + 1.96 * std.error,
+    is_significant = (CI_lower > 0 & CI_upper > 0) | (CI_lower < 0 & CI_upper < 0)
+  )
+
+fixed_effects_mgt_df <- fixed_effects_mgt_df %>%
+  mutate(
+    term = recode(term,
+                  "acresCroplandTreated_scaled" = "Cropland Treated (Fertilizer, Scaled)",
+                  "areaOperatedAcresOperationMedian_scaled" = "Median Acres/Operation (Size, Scaled)",
+                  "machineryAssetValueZ" = "Machinery Asset Value (Z-Score)"),
+    term_wrapped = str_wrap(term, width = 25) #this was to help with text display, idk if does anything
+  )
+
+base_colors <- c("TRUE" = "#E74C3C", "FALSE" = "#3498DB") #Red for significant, blue for not
+
+figure2<- ggplot(fixed_effects_mgt_df, aes(x = estimate, 
+                                 y = reorder(term_wrapped, estimate),
+                                 color = is_significant)) +
+    geom_vline(xintercept = 0, linetype = "dashed", color = "gray50") +
+    geom_pointrange(aes(xmin = CI_lower, xmax = CI_upper), size = 1.1) +
+    scale_color_manual(values = base_colors) +
+    labs(
+    title = "Farm differences have Varrying Impacts on Corn Yield ",
+    x = "Coefficient Estimate (Change in SD of Corn Yield)",
+    y = NULL,
+    caption = "Figure 2. The effect of a 1-standard deviation increase in each management variable on corn yield.
+    Only variables with data prior to 2017 used.
+    Points show coefficient estimate; bars show 95% Confidence Interval (LME Mode). Controlled for weather.
+    Red indicates statistically significant effects (p < 0.05). All variables are scaled/z-scored."
+  ) +
+    theme_minimal(base_size = 14, base_family = "serif") +
+  theme(
+    panel.grid.major.y = element_blank(), 
+    panel.grid.minor = element_blank(),
+    axis.text.y = element_text(face = "bold", size = 11, lineheight = 0.8),
+    legend.position = "none",
+    plot.title = element_text(face = "bold", family = "serif"),
+    plot.caption = element_text(hjust = 0, size = 10, family = "serif")
+  )
+#ggsave("visuals/management_effects_plot.png", plot = figure2, width = 9, height = 3.5, units = "in")
+```
+
+# Number 2
+
+## Model2
+
+```{r}
+core_fixed_vars2_scaled <- c(
+  paste0("PC", 1:10), 
+  "areaNoTill_scaled",
+  "avgProducerAge_scaled",
+  "CropAcresOperation_scaled",
+  "avgYearsOnPresentOperation_scaled"
+)
+
+core_fixed_formula2_scaled <- as.formula(paste("cornYield ~", paste(core_fixed_vars2_scaled, collapse = " + ")))
+
+df_core_model_data2 <- df_scaled %>%
+  select(year, county, cornYield, all_of(core_fixed_vars2_scaled)) %>%
+  na.omit() 
+
+model_core2 <- lme(
+  fixed = core_fixed_formula2_scaled,
+  random = ~ 1 | county,
+  data = df_core_model_data2,
+  method = "REML"
+)
+#summary(model_core2)
+```
+
+## Visual 2
+
+```{r}
+
+fixed_effects_mgt_df2 <- broom.mixed::tidy(model_core2) %>%
+  filter(effect == "fixed", term != "(Intercept)") %>%
+  
+filter(!grepl("^PC", term)) %>%
+  mutate(
+    CI_lower = estimate - 1.96 * std.error,
+    CI_upper = estimate + 1.96 * std.error,
+    is_significant = (CI_lower > 0 & CI_upper > 0) | (CI_lower < 0 & CI_upper < 0)
+  )
+
+fixed_effects_mgt_df2 <- fixed_effects_mgt_df2 %>%
+  mutate(
+    term = recode(term,
+                  "areaNoTill_scaled" = "Area No-Till (Conservation, Scaled)",
+                  "avgProducerAge_scaled" = "Average Producer Age (Demographics, Scaled)",
+                  "CropAcresOperation_scaled" = "Crop Acres per Operation (Intensity, Scaled)",
+                  "avgYearsOnPresentOperation_scaled" = "Years on Present Operation (Experience, Scaled)"),
+    term_wrapped = str_wrap(term, width = 30) 
+  )
+
+
+#plot
+figure3 <- ggplot(fixed_effects_mgt_df2, aes(x = estimate, 
+                                 y = reorder(term_wrapped, estimate), 
+                                 color = is_significant)) +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "gray50") +
+  geom_pointrange(aes(xmin = CI_lower, xmax = CI_upper), size = 1.1) +
+  scale_color_manual(values = base_colors) +
+ labs(
+    title = "Farm differences with less data have 
+less effect on Corn Yield ",
+    x = "Coefficient Estimate (Change in SD of Corn Yield)",
+    y = NULL,
+    caption = "Figure 3. The effect of a 1-standard deviation increase in each management variable on corn yield.
+    Only variables with data prior to 2017 used.
+    Points show coefficient estimate; bars show 95% Confidence Interval (LME Mode). Controlled for weather.
+    Red indicates statistically significant effects (p < 0.05). All variables are scaled."
+  ) +
+  theme_minimal(base_size = 14, base_family = "serif") +
+  theme(
+    panel.grid.major.y = element_blank(), 
+    panel.grid.minor = element_blank(),
+    axis.text.y = element_text(face = "bold", size = 10, lineheight = 0.8), 
+    legend.position = "none",
+    plot.title = element_text(face = "bold", family = "serif"),
+    plot.caption = element_text(hjust = 0, size = 9, family = "serif"),
+    plot.margin = unit(c(0.2, 0.2, 0.5, 0.2), "cm") #Trying way to hard to make it reaosonable looking
+  )
+#ggsave("visuals/management_effects_plot2.png", plot = figure3, width = 9, height = 3.5, units = "in")
+
+
+```
+
+## Assumptions
+
+```{r}
+#Not all checkd assumptions present since I just changed model names (since assumption graphs not included in final report)
+plot(model_core2)
+qqnorm(residuals(model_core2))
+qqline(residuals(model_core_final))
+plot(fitted(model_yield_final), residuals(model_core2))
+
+```
