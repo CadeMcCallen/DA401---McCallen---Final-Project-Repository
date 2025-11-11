@@ -1,0 +1,286 @@
+---
+title: "ManStyleData"
+author: "Cade McCallen"
+format: html
+editor: visual
+---
+
+```{r}
+library(dplyr)
+library(tidyr)
+library(stringr)
+
+#Run in concil since pathway is set up as if WD is in "main file"
+land_area <- read.csv("initialData/ManStyle/AcrageFarmedCounty.csv")
+sus_practices <- read.csv("initialData/ManStyle/noTill_Cover_Riparian.csv")
+machine <- read.csv("initialData/ManStyle/MachineValue.csv")
+producer <- read.csv("initialData/ManStyle/producerInfo.csv")
+fertilize <- read.csv("initialData/ManStyle/fertilized.csv")
+```
+
+## Land area farmed
+
+```{r}
+land_wide <- land_area %>%
+  mutate(
+  Value = as.numeric(gsub(",", "", Value)),
+) %>%
+  filter(Program != "SURVEY") %>%
+  
+  select(Year, Ag.District, Ag.District.Code, County, County.ANSI,
+         Data.Item, Value, CV....) %>%
+  pivot_wider(
+    names_from = Data.Item,
+    values_from = c(Value, `CV....`),
+    names_sep = "_"
+  ) %>%
+  rename(
+    year = Year,
+    agDistrict = Ag.District,
+    agDistrictCode = Ag.District.Code,
+    county = County,
+    countyANSI = County.ANSI,
+    acresOperated = `Value_FARM OPERATIONS - ACRES OPERATED`,
+    areaOperatedAcresOperation = `Value_FARM OPERATIONS - AREA OPERATED, MEASURED IN ACRES / OPERATION`,
+    areaOperatedAcresOperationMedian = `Value_FARM OPERATIONS - AREA OPERATED, MEASURED IN ACRES / OPERATION, MEDIAN`,
+    areaOperatedPctTotalLand = `Value_FARM OPERATIONS - AREA OPERATED, MEASURED IN PCT OF TOTAL LAND`,
+    cvAcresOperated = `CV...._FARM OPERATIONS - ACRES OPERATED`,
+    cvAreaOperatedAcresOperation = `CV...._FARM OPERATIONS - AREA OPERATED, MEASURED IN ACRES / OPERATION`,
+    cvAreaOperatedAcresOperationMedian = `CV...._FARM OPERATIONS - AREA OPERATED, MEASURED IN ACRES / OPERATION, MEDIAN`,
+    cvAreaOperatedPctTotalLand = `CV...._FARM OPERATIONS - AREA OPERATED, MEASURED IN PCT OF TOTAL LAND`
+  )
+
+
+```
+
+## Sustainable Practices
+
+```{r}
+sus_practices_wide <- sus_practices %>%
+   mutate(
+  Value = as.numeric(gsub(",", "", Value)),
+) %>%
+  filter(Program != "SURVEY") %>%
+  select(Year, Ag.District, Ag.District.Code, County, County.ANSI,
+         Data.Item, Value, CV....) %>%
+  pivot_wider(
+    names_from = Data.Item,
+    values_from = c(Value, `CV....`),
+    names_sep = "_"
+  ) %>%
+  rename(
+    year = Year,
+    agDistrict = Ag.District,
+    agDistrictCode = Ag.District.Code,
+    county = County,
+    countyANSI = County.ANSI
+  )
+
+sus_practices_wide <- sus_practices_wide %>%
+  rename(
+    year = year,
+    agDistrict = agDistrict,
+    agDistrictCode = agDistrictCode,
+    county = county,
+    countyANSI = countyANSI,
+
+    # in number of ops
+    AlleySilvoForestRiparian = 
+      `Value_PRACTICES, ALLEY CROPPING & SILVOPASTURE & FOREST FARMING, OR RIPARIAN FOREST BUFFERS & WINDBREAKS - NUMBER OF OPERATIONS`,
+
+    # No till, acres/op
+    areaNoTill = 
+      `Value_PRACTICES, LAND USE, CROPLAND, CONSERVATION TILLAGE, NO-TILL - AREA, MEASURED IN ACRES / OPERATION`,
+
+    # cover crop acres/operation
+    CropAcresOperation = 
+      `Value_PRACTICES, LAND USE, CROPLAND, COVER CROP PLANTED, (EXCL CRP) - AREA, MEASURED IN ACRES / OPERATION`,
+
+  
+    cvAlleySilvoForestRiparian = 
+      `CV...._PRACTICES, ALLEY CROPPING & SILVOPASTURE & FOREST FARMING, OR RIPARIAN FOREST BUFFERS & WINDBREAKS - NUMBER OF OPERATIONS`,
+
+    cvAreaNoTillAcresOperation = 
+      `CV...._PRACTICES, LAND USE, CROPLAND, CONSERVATION TILLAGE, NO-TILL - AREA, MEASURED IN ACRES / OPERATION`,
+
+    cvAreaCoverCropAcresOperation = 
+      `CV...._PRACTICES, LAND USE, CROPLAND, COVER CROP PLANTED, (EXCL CRP) - AREA, MEASURED IN ACRES / OPERATION`
+  )
+
+```
+
+## Machine Value
+
+```{r}
+machine_wide <- machine %>%
+   mutate(
+  Value = as.numeric(gsub(",", "", Value)),
+) %>%
+  filter(Program != "SURVEY") %>%  
+  select(Year, Ag.District, Ag.District.Code, County, County.ANSI,
+         Data.Item, Value, CV....) %>%
+  pivot_wider(
+    names_from = Data.Item,
+    values_from = c(Value, `CV....`),
+    names_sep = "_"
+  ) %>%
+  rename(
+    year = Year,
+    agDistrict = Ag.District,
+    agDistrictCode = Ag.District.Code,
+    county = County,
+    countyANSI = County.ANSI,
+    # nominal $/operation
+    valueMachineryAssetValue = 
+      `Value_MACHINERY TOTALS - ASSET VALUE, MEASURED IN $ / OPERATION`,
+    
+    cvMachineryAssetValue = 
+      `CV...._MACHINERY TOTALS - ASSET VALUE, MEASURED IN $ / OPERATION`
+  )
+
+#inflation adjustment
+machine_wide <- machine_wide %>%
+  group_by(year) %>%
+  mutate( 
+    #zscore is reltive to the years mean/sd
+    machineryAssetValueZ = (
+      valueMachineryAssetValue - mean(valueMachineryAssetValue, na.rm = TRUE)
+    ) / sd(valueMachineryAssetValue, na.rm = TRUE)
+  ) %>%
+  ungroup()
+
+```
+
+## Producer
+
+```{r}
+producer_final <- producer %>%
+  filter(Program != "SURVEY") %>%
+  select(Year, Ag.District, Ag.District.Code, County, County.ANSI,
+         Data.Item, Value, CV....) %>%
+  mutate(
+    Value = as.numeric(gsub(",", "", Value)),
+  ) %>%
+  pivot_wider(
+    names_from = Data.Item,
+    values_from = c(Value, `CV....`),
+    names_sep = "_"
+  ) %>%
+  rename(
+    year = Year,
+    agDistrict = Ag.District,
+    agDistrictCode = Ag.District.Code,
+    county = County,
+    countyANSI = County.ANSI,
+    avgProducerAge = 
+      `Value_PRODUCERS - AGE, AVG, MEASURED IN YEARS`,
+
+    avgYearsOnAnyOperation = 
+      `Value_PRODUCERS - YEARS ON ANY OPERATION, AVG, MEASURED IN YEARS`,
+
+    avgYearsOnPresentOperation = 
+      `Value_PRODUCERS - YEARS ON PRESENT OPERATION, AVG, MEASURED IN YEARS`,
+
+    cvAvgProducerAge = 
+      `CV...._PRODUCERS - AGE, AVG, MEASURED IN YEARS`,
+
+    cvAvgYearsOnAnyOperation = 
+      `CV...._PRODUCERS - YEARS ON ANY OPERATION, AVG, MEASURED IN YEARS`,
+
+    cvAvgYearsOnPresentOperation = 
+      `CV...._PRODUCERS - YEARS ON PRESENT OPERATION, AVG, MEASURED IN YEARS`
+  )
+
+```
+
+## Fertilizer Rate
+
+```{r}
+fertilize_final <- fertilize %>%
+  filter(Program != "SURVEY") %>%
+  select(Year, Ag.District, Ag.District.Code, County, County.ANSI,
+         Data.Item, Value, CV....) %>%
+  mutate(
+    Value = as.numeric(gsub(",", "", Value))
+  ) %>%
+  pivot_wider(
+    names_from = Data.Item,
+    values_from = c(Value, `CV....`),
+    names_sep = "_"
+  ) %>%
+  rename(
+    year = Year,
+    agDistrict = Ag.District,
+    agDistrictCode = Ag.District.Code,
+    county = County,
+    countyANSI = County.ANSI,
+    
+    acresCroplandTreated = 
+      `Value_AG LAND, CROPLAND, (EXCL PASTURED) - TREATED, MEASURED IN ACRES`,
+    cvAcresCroplandTreated = 
+      `CV...._AG LAND, CROPLAND, (EXCL PASTURED) - TREATED, MEASURED IN ACRES`
+  )
+
+```
+
+## Final Combine:
+
+```{r}
+
+producer_final <- producer_final %>%
+  select(-agDistrict, -agDistrictCode, -countyANSI)
+
+machine_final <- machine_wide %>%
+  select(-agDistrict, -agDistrictCode, -countyANSI)
+
+sus_practices_final <- sus_practices_wide %>%
+  select(-agDistrict, -agDistrictCode, -countyANSI)
+
+fertilize_final <- fertilize_final %>%
+  select(-agDistrict, -agDistrictCode, -countyANSI)
+
+combined_man <- land_wide %>%
+  full_join(sus_practices_final, by = c("year", "county")) %>%
+  full_join(machine_final,      by = c("year", "county")) %>%
+  full_join(producer_final,     by = c("year", "county")) %>%
+  full_join(fertilize_final,    by = c("year", "county"))
+
+#write.csv(combined_man, "data/soc_man_final.csv", row.names = FALSE)
+
+```
+
+## Final Dfs (pca done for use in man_soc analysis)
+
+```{r}
+# write.csv(df_wide_clean, "data/weather_cornyield_final_scaled.csv", row.names = FALSE)
+
+#soc_man <- read.csv("data/soc_man_final.csv")
+#weather <- read.csv("data/weather_cornyield_final.csv")
+#weather_scale <- read.csv("data/weather_cornyield_final_scaled.csv")
+
+
+
+df_for_pca <- weather_scale %>%
+  select(starts_with("precip_"), starts_with("avgT_"), starts_with("minT_"))
+
+pca_results <- prcomp(
+  df_for_pca, 
+  center = FALSE, 
+  scale. = FALSE
+)
+
+
+#summary(pca_results)
+
+pc_scores <- as.data.frame(pca_results$x[, 1:10]) #80% in these
+
+df_with_pca <- df_wide_clean %>%
+  select(year, county, cornYield) %>% 
+  bind_cols(pc_scores) # 
+
+
+test_pca <- lme(cornYield ~ PC1 + PC2 + PC3 + PC4 + PC5, random = ~ 1 | county, data = df_with_pca)
+weather_scale
+#summary(test_pca)
+#write.csv(df_with_pca, "data/weather_cornyield_final_pca.csv", row.names = FALSE)
+```

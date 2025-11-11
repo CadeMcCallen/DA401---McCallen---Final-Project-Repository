@@ -74,7 +74,6 @@ ag_clean$county[ag_clean$county == "OTHER (COMBINED) COUNTIES"] <- "OTHER COUNTI
 
 
 
-#write.csv(ag_clean, "agData1.csv", row.names = FALSE)
 
 
 
