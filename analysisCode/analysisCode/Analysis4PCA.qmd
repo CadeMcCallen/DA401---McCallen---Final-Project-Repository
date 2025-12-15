@@ -1,0 +1,58 @@
+---
+title: "Analysis4PCA"
+author: "Cade McCallen"
+format: html
+editor: visual
+---
+
+```{r}
+##Setup preformed in dataSetup/ManStyleDataSetup
+```
+
+
+## Plots
+
+```{r}
+library(ggplot2)
+library(dplyr)
+library(stringr)
+
+var_explained <- summary(pca_results)$importance[2,] * 100
+
+n_pcs <- length(var_explained)
+pc_df <- data.frame(
+  PC = 1:n_pcs,
+  variance = var_explained
+)
+
+#plot(var_explained[1:10], type = "b", xlab = "Principal Component", ylab = "Variance Explained (%)")
+
+### ---- Figure 2 ---- Chat GPT help for astetics
+figure2 <- ggplot(pc_df, aes(x = PC, y = variance)) +
+  geom_line(aes(group = 1), linewidth = 0.8) +
+  geom_point(size = 2) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "gray50") +
+  scale_x_continuous(
+    breaks = seq(2, n_pcs, by = 2),     # only 2,4,6,... 
+    labels = seq(2, n_pcs, by = 2)
+  ) +
+  labs(
+    title = "Variance Explained by PC's limited after 10 PC's",
+    x = "Principal Component",
+    y = "Variance Explained (%)",
+    caption = "Figure 2. Scree plot showing the percentage of variance explained by each principal component.\nValues above 10 don't explain more than 3% individually."
+  ) +
+  theme_minimal(base_size = 14, base_family = "serif") +
+  theme(
+    panel.grid.minor = element_blank(),
+    panel.grid.major.x = element_blank(),
+    axis.text.x = element_text(face = "bold", size = 10),
+    axis.text.y = element_text(face = "bold", size = 10),
+    plot.title = element_text(face = "bold", family = "serif"),
+    plot.caption = element_text(hjust = 0, size = 10, family = "serif")
+  )
+
+figure2
+#ggsave("visuals/pca_scree_plot.png", plot = figure2, width = 9, height = 4, units = "in")
+```
+
